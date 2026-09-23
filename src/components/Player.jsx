@@ -94,6 +94,14 @@ export default function Player({
 
     const video = videoRef.current;
 
+    // En Smart TV / APK, el audio debe estar siempre habilitado y al 100% para el control remoto
+    if (isTv) {
+      video.muted = false;
+      video.volume = 1.0;
+      setIsMuted(false);
+      setVolume(1.0);
+    }
+
     if (Hls.isSupported()) {
       const hls = new Hls({
         enableWorker: true,
@@ -113,16 +121,36 @@ export default function Player({
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         setIsBuffering(false);
+        if (isTv) {
+          video.muted = false;
+          video.volume = 1.0;
+        }
         const playPromise = video.play();
         if (playPromise !== undefined) {
           playPromise
-            .then(() => setIsPlaying(true))
+            .then(() => {
+              setIsPlaying(true);
+              if (isTv) {
+                video.muted = false;
+                video.volume = 1.0;
+              }
+            })
             .catch(() => {
-              video.muted = true;
-              setIsMuted(true);
-              video.play()
-                .then(() => setIsPlaying(true))
-                .catch(() => setIsPlaying(false));
+              if (isTv) {
+                // En Smart TV / APK nunca mutear el video; el control remoto físico maneja el volumen
+                video.muted = false;
+                video.volume = 1.0;
+                video.play()
+                  .then(() => setIsPlaying(true))
+                  .catch((err) => console.warn('Autoplay en TV:', err));
+              } else {
+                // En navegadores web de escritorio con políticas de autoplay estrictas
+                video.muted = true;
+                setIsMuted(true);
+                video.play()
+                  .then(() => setIsPlaying(true))
+                  .catch(() => setIsPlaying(false));
+              }
             });
         }
       });
@@ -163,8 +191,16 @@ export default function Player({
       });
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = streamUrl;
+      if (isTv) {
+        video.muted = false;
+        video.volume = 1.0;
+      }
       video.addEventListener('loadedmetadata', () => {
         setIsBuffering(false);
+        if (isTv) {
+          video.muted = false;
+          video.volume = 1.0;
+        }
         video.play().then(() => setIsPlaying(true));
       });
     } else {
@@ -172,7 +208,7 @@ export default function Player({
       setErrorMessage('Tu sistema no soporta decodificación HLS.');
       setIsBuffering(false);
     }
-  }, []);
+  }, [isTv]);
 
   // Manejo de carga de canal con resolución nativa en Rust para redirecciones dinámicas
   useEffect(() => {
@@ -250,6 +286,12 @@ export default function Player({
     const handlePlaying = () => {
       setIsBuffering(false);
       setIsPlaying(true);
+      if (isTv && videoRef.current) {
+        videoRef.current.muted = false;
+        videoRef.current.volume = 1.0;
+        setIsMuted(false);
+        setVolume(1.0);
+      }
     };
     const handlePause = () => setIsPlaying(false);
     const handleError = () => {
@@ -269,7 +311,17 @@ export default function Player({
       video.removeEventListener('pause', handlePause);
       video.removeEventListener('error', handleError);
     };
-  }, [isYouTube]);
+  }, [isYouTube, isTv]);
+
+  // Asegurar que el audio siempre esté activo y al 100% en Smart TV / APK
+  useEffect(() => {
+    if (isTv && videoRef.current) {
+      videoRef.current.muted = false;
+      videoRef.current.volume = 1.0;
+      setIsMuted(false);
+      setVolume(1.0);
+    }
+  }, [channel, isTv]);
 
   const handleMouseMove = () => {
     setShowControls(true);
@@ -531,20 +583,23 @@ export default function Player({
                 {isPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current ml-0.5" />}
               </button>
 
-              <div className="flex items-center space-x-2">
-                <button onClick={toggleMute} className="text-gray-300 hover:text-pumpkin transition-colors p-1">
-                  {isMuted || volume === 0 ? <VolumeX className="w-5 h-5 text-pumpkin" /> : <Volume2 className="w-5 h-5" />}
-                </button>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={isMuted ? 0 : volume}
-                  onChange={handleVolumeChange}
-                  className="w-20 h-1.5 bg-charcoal-border rounded-lg appearance-none cursor-pointer accent-pumpkin"
-                />
-              </div>
+              {/* Controles de volumen en pantalla (Solo en PC; en TV/APK el volumen se controla con el control remoto físico) */}
+              {!isTv && (
+                <div className="flex items-center space-x-2">
+                  <button onClick={toggleMute} className="text-gray-300 hover:text-pumpkin transition-colors p-1">
+                    {isMuted || volume === 0 ? <VolumeX className="w-5 h-5 text-pumpkin" /> : <Volume2 className="w-5 h-5" />}
+                  </button>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={isMuted ? 0 : volume}
+                    onChange={handleVolumeChange}
+                    className="w-20 h-1.5 bg-charcoal-border rounded-lg appearance-none cursor-pointer accent-pumpkin"
+                  />
+                </div>
+              )}
             </div>
 
             <button
