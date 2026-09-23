@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom Scrollbars in Charcoal / Pumpkin */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #182933;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #35566B;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #FD802E;
+}
+
+/* Base resets for frameless desktop app */
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
