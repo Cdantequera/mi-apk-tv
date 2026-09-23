@@ -7,6 +7,10 @@
  * Determina si una URL pertenece a un acortador, redireccionador dinámico o proveedor
  * con restricciones estrictas de CORS como Pluto TV.
  */
+/**
+ * Determina si una URL pertenece a un acortador, redireccionador dinámico, Cloudflare Worker
+ * o proveedor con restricciones estrictas de CORS (como Pluto TV o AWS IVS).
+ */
 export function isRedirectUrl(url) {
   if (!url) return false;
   return (
@@ -19,16 +23,17 @@ export function isRedirectUrl(url) {
     url.includes('short.gy') ||
     url.includes('tinyurl.com') ||
     url.includes('bit.ly') ||
-    url.includes('pls.link')
+    url.includes('pls.link') ||
+    url.includes('live-video.net') ||
+    url.includes('kick.com')
   );
 }
 
 /**
  * Resuelve y adapta la URL de streaming para evadir bloqueos de CORS y redirecciones 302.
  * 
- * - Si estamos en Android / Smart TV, usa la interfaz nativa AndroidStreamHelper.
- * - Si estamos en entorno de desarrollo o servidor local (localhost / 127.0.0.1),
- *   enruta la solicitud a través del endpoint /api/stream-proxy configurado en Vite.
+ * - En la app Android APK en TV (donde MainActivity maneja /api/stream-proxy de forma nativa)
+ *   o en entorno de desarrollo local (localhost), enruta la solicitud a través del endpoint /api/stream-proxy.
  * - Si estamos en Tauri Desktop nativo, invoca resolver_url_redireccion en Rust.
  * 
  * @param {string} url - URL original del canal IPTV (.m3u8 o acortador)
@@ -37,38 +42,23 @@ export function isRedirectUrl(url) {
 export async function resolveStreamUrl(url) {
   if (!url) return url;
 
-  // Si estamos en la app nativa de Android / Smart TV
-  if (
-    typeof window !== 'undefined' &&
-    window.AndroidStreamHelper &&
-    typeof window.AndroidStreamHelper.resolveUrl === 'function'
-  ) {
-    try {
-      const resolved = window.AndroidStreamHelper.resolveUrl(url);
-      if (resolved && resolved.startsWith('http')) {
-        return resolved;
-      }
-    } catch (err) {
-      console.warn('[urlResolver] Fallback desde AndroidStreamHelper:', err);
-    }
-  }
-
   // Si no requiere resolución especial, reproducir directamente
   if (!isRedirectUrl(url)) {
     return url;
   }
 
-  // Si estamos en entorno con servidor local (navegador web o dev en localhost)
-  const isLocalDev =
+  // En Android TV (APK) o en entorno de desarrollo PC (localhost)
+  const canUseNativeOrDevProxy =
     typeof window !== 'undefined' &&
     (window.location.hostname === 'localhost' ||
-      window.location.hostname === '127.0.0.1');
+      window.location.hostname === '127.0.0.1' ||
+      typeof window.AndroidStreamHelper !== 'undefined');
 
-  if (isLocalDev) {
+  if (canUseNativeOrDevProxy) {
     return `/api/stream-proxy?url=${encodeURIComponent(url)}`;
   }
 
-  // Si estamos en Tauri Desktop nativo sin servidor dev de Node
+  // Si estamos en Tauri Desktop nativo
   if (typeof window !== 'undefined' && window.__TAURI_INTERNALS__) {
     try {
       const { invoke } = await import('@tauri-apps/api/core');
