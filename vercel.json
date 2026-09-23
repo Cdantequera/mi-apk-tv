@@ -1,0 +1,14 @@
+{
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
+  ],
+  "functions": {
+    "api/stream-proxy.js": {
+      "maxDuration": 30
+    }
+  }
+}

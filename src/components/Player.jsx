@@ -160,17 +160,13 @@ export default function Player({
         if (data.fatal) {
           switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
-              // Si la carga directa falló por CORS, token o bloqueo de red,
-              // reintentar automáticamente a través del proxy nativo de Android TV o Vite dev
+              // Si la carga directa falló por CORS, token, contenido mixto o bloqueo de red,
+              // reintentar automáticamente a través del proxy (/api/stream-proxy)
               if (
                 !streamUrl.includes('/api/stream-proxy') &&
-                channel?.url &&
-                (typeof window !== 'undefined' &&
-                  (window.location.hostname === 'localhost' ||
-                    window.location.hostname === '127.0.0.1' ||
-                    typeof window.AndroidStreamHelper !== 'undefined'))
+                channel?.url
               ) {
-                console.log('[Player] Fallo directo de red/CORS. Reintentando con proxy nativo:', channel.url);
+                console.log('[Player] Fallo directo de red/CORS. Reintentando con proxy:', channel.url);
                 hls.destroy();
                 const proxyUrl = `/api/stream-proxy?url=${encodeURIComponent(channel.url)}`;
                 loadStream(proxyUrl);

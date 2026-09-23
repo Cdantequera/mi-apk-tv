@@ -8,12 +8,21 @@
  * con restricciones estrictas de CORS como Pluto TV.
  */
 /**
- * Determina si una URL pertenece a un acortador, redireccionador dinámico, Cloudflare Worker
- * o proveedor con restricciones estrictas de CORS (como Pluto TV o AWS IVS).
+ * Determina si una URL pertenece a un acortador, redireccionador dinámico, Cloudflare Worker,
+ * contenido mixto HTTP (en sitio HTTPS) o proveedor con restricciones estrictas de CORS.
  */
 export function isRedirectUrl(url) {
   if (!url) return false;
+
+  // Si la aplicación se carga en HTTPS (como en Vercel) y la URL es HTTP no segura,
+  // el navegador bloquearía la petición por "Mixed Content". Se debe enrutar al proxy.
+  const isMixedContent =
+    typeof window !== 'undefined' &&
+    window.location.protocol === 'https:' &&
+    url.startsWith('http://');
+
   return (
+    isMixedContent ||
     url.includes('jmp2.uk') ||
     url.includes('pluto.tv') ||
     url.includes('stitcher') ||
@@ -47,17 +56,6 @@ export async function resolveStreamUrl(url) {
     return url;
   }
 
-  // En Android TV (APK) o en entorno de desarrollo PC (localhost)
-  const canUseNativeOrDevProxy =
-    typeof window !== 'undefined' &&
-    (window.location.hostname === 'localhost' ||
-      window.location.hostname === '127.0.0.1' ||
-      typeof window.AndroidStreamHelper !== 'undefined');
-
-  if (canUseNativeOrDevProxy) {
-    return `/api/stream-proxy?url=${encodeURIComponent(url)}`;
-  }
-
   // Si estamos en Tauri Desktop nativo
   if (typeof window !== 'undefined' && window.__TAURI_INTERNALS__) {
     try {
@@ -70,6 +68,7 @@ export async function resolveStreamUrl(url) {
     }
   }
 
-  // Fallback directo
-  return url;
+  // Tanto en Android TV (APK), localhost (dev), como en Vercel (web en internet):
+  // /api/stream-proxy está soportado y resuelve CORS y redirecciones
+  return `/api/stream-proxy?url=${encodeURIComponent(url)}`;
 }
